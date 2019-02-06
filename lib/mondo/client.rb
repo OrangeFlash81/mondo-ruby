@@ -11,7 +11,7 @@ require 'money'
 
 module Mondo
   class Client
-    DEFAULT_API_URL = 'https://api.getmondo.co.uk'
+    DEFAULT_API_URL = 'https://api.monzo.com'
 
     attr_accessor :access_token, :account_id, :api_url
 
@@ -124,6 +124,16 @@ module Mondo
       resp.parsed["transactions"].map { |tx| Transaction.new(tx, self) }
     end
 
+    # @method receipt
+    # @return [Receipt] a receipt with a given external ID
+    def receipt(opts = {})
+      raise ClientError.new("You must provide an account id to get receipts") unless self.account_id
+      opts.merge!(account_id: self.account_id)
+      resp = api_get("/transaction-receipts", opts)
+      return resp if resp.error.present?
+      Receipt.new(resp.parsed["receipt"], self)
+    end
+
     # @method transaction
     # @return <Transaction> of the transaction information
     def transaction(transaction_id, opts = {})
@@ -198,11 +208,14 @@ module Mondo
       opts[:headers]['Authorization'] = "Bearer #{@access_token}"
 
       if !opts[:data].nil?
-        opts[:body] = opts[:data].to_param
-
-        puts "SETTING BODY #{opts[:body]}"
-
-        opts[:headers]['Content-Type'] = 'application/x-www-form-urlencoded' # sob sob
+        # Receipts use raw JSON, everything else uses form encoding
+        if path == '/transaction-receipts'
+          opts[:body] = opts[:data].to_json
+          p opts[:body]
+        else
+          opts[:body] = opts[:data].to_param
+          opts[:headers]['Content-Type'] = 'application/x-www-form-urlencoded' # sob sob
+        end
       end
 
       path = URI.encode(path)
