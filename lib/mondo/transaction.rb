@@ -54,6 +54,11 @@ module Mondo
       self.attachments << attachment if attachment.register
     end
 
+    def add_receipt(args={})
+      args.merge!(transaction_id: id)
+      self.client.api_put("/transaction-receipts", args)
+    end
+
     def attachments
       @transactions ||= begin
         raw_data['attachments'].map { |tx| Attachment.new(tx, self.client) }
